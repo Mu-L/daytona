@@ -6,7 +6,9 @@ package registry
 import (
 	"context"
 	"fmt"
+	"net"
 	"os"
+	"os/exec"
 
 	"github.com/daytonaio/daytona/pkg/docker"
 	"github.com/docker/docker/api/types/container"
@@ -52,6 +54,14 @@ func (s *LocalContainerRegistry) Start() error {
 		return err
 	}
 
+	if _, err := exec.LookPath("docker"); err != nil {
+		return fmt.Errorf("cannot find Docker installation. Please install by following https://docs.docker.com/engine/install/ and try again")
+	}
+
+	if _, err := cli.Info(ctx); err != nil {
+		return fmt.Errorf("cannot connect to the Docker daemon. Is the Docker daemon running?")
+	}
+
 	dockerClient := docker.NewDockerClient(docker.DockerClientConfig{
 		ApiClient: cli,
 	})
@@ -60,6 +70,11 @@ func (s *LocalContainerRegistry) Start() error {
 	//	to avoid conflicts with configuration changes
 	if err := RemoveRegistryContainer(); err != nil {
 		return err
+	}
+
+	_, err = net.Dial("tcp", fmt.Sprintf(":%d", s.port))
+	if err == nil {
+		return fmt.Errorf("cannot start registry, port %d is already in use", s.port)
 	}
 
 	// Pull the image

@@ -19,11 +19,13 @@ import (
 	. "github.com/daytonaio/daytona/pkg/cmd/ports"
 	. "github.com/daytonaio/daytona/pkg/cmd/profile"
 	. "github.com/daytonaio/daytona/pkg/cmd/profiledata/env"
+	. "github.com/daytonaio/daytona/pkg/cmd/projectconfig"
 	. "github.com/daytonaio/daytona/pkg/cmd/provider"
 	. "github.com/daytonaio/daytona/pkg/cmd/server"
 	. "github.com/daytonaio/daytona/pkg/cmd/target"
 	. "github.com/daytonaio/daytona/pkg/cmd/telemetry"
 	. "github.com/daytonaio/daytona/pkg/cmd/workspace"
+	"github.com/daytonaio/daytona/pkg/common"
 	"github.com/daytonaio/daytona/pkg/posthogservice"
 	"github.com/daytonaio/daytona/pkg/telemetry"
 	view "github.com/daytonaio/daytona/pkg/views/initial"
@@ -52,6 +54,7 @@ func Execute() {
 	rootCmd.AddCommand(SshProxyCmd)
 	rootCmd.AddCommand(CreateCmd)
 	rootCmd.AddCommand(DeleteCmd)
+	rootCmd.AddCommand(ProjectConfigCmd)
 	rootCmd.AddCommand(ServeCmd)
 	rootCmd.AddCommand(ServerCmd)
 	rootCmd.AddCommand(ApiKeyCmd)
@@ -190,7 +193,11 @@ func SetupRootCommand(cmd *cobra.Command) {
 func RunInitialScreenFlow(cmd *cobra.Command, args []string) {
 	command, err := view.GetCommand()
 	if err != nil {
-		log.Fatal(err)
+		if common.IsCtrlCAbort(err) {
+			return
+		} else {
+			log.Fatal(err)
+		}
 	}
 
 	switch command {

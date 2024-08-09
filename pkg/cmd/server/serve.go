@@ -5,7 +5,6 @@ package server
 
 import (
 	"fmt"
-	"io"
 	"net/url"
 	"os"
 	"os/signal"
@@ -20,7 +19,6 @@ import (
 	"github.com/daytonaio/daytona/pkg/apikey"
 	"github.com/daytonaio/daytona/pkg/build"
 	"github.com/daytonaio/daytona/pkg/db"
-	"github.com/daytonaio/daytona/pkg/git"
 	"github.com/daytonaio/daytona/pkg/logs"
 	"github.com/daytonaio/daytona/pkg/posthogservice"
 	"github.com/daytonaio/daytona/pkg/provider/manager"
@@ -31,9 +29,11 @@ import (
 	"github.com/daytonaio/daytona/pkg/server/gitproviders"
 	"github.com/daytonaio/daytona/pkg/server/headscale"
 	"github.com/daytonaio/daytona/pkg/server/profiledata"
+	"github.com/daytonaio/daytona/pkg/server/projectconfig"
 	"github.com/daytonaio/daytona/pkg/server/providertargets"
 	"github.com/daytonaio/daytona/pkg/server/registry"
 	"github.com/daytonaio/daytona/pkg/server/workspaces"
+	"github.com/daytonaio/daytona/pkg/views"
 	started_view "github.com/daytonaio/daytona/pkg/views/server/started"
 
 	log "github.com/sirupsen/logrus"
@@ -46,6 +46,10 @@ var ServeCmd = &cobra.Command{
 	GroupID: util.SERVER_GROUP,
 	Args:    cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
+		if os.Getenv("USER") == "root" {
+			views.RenderInfoMessageBold("Running the server as root is not recommended because\nDaytona will not be able to remap project directory ownership.\nPlease run the server as a non-root user.")
+		}
+
 		if log.GetLevel() < log.InfoLevel {
 			//	for now, force the log level to info when running the server
 			log.SetLevel(log.InfoLevel)
@@ -100,6 +104,10 @@ var ServeCmd = &cobra.Command{
 		if err != nil {
 			log.Fatal(err)
 		}
+		projectConfigStore, err := db.NewProjectConfigStore(dbConnection)
+		if err != nil {
+			log.Fatal(err)
+		}
 		gitProviderConfigStore, err := db.NewGitProviderConfigStore(dbConnection)
 		if err != nil {
 			log.Fatal(err)
@@ -116,7 +124,7 @@ var ServeCmd = &cobra.Command{
 		if err != nil {
 			log.Fatal(err)
 		}
-		buildResultStore, err := db.NewBuildResultStore(dbConnection)
+		buildStore, err := db.NewBuildStore(dbConnection)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -126,6 +134,7 @@ var ServeCmd = &cobra.Command{
 			FrpsDomain:    c.Frps.Domain,
 			FrpsProtocol:  c.Frps.Protocol,
 			HeadscalePort: c.HeadscalePort,
+			ConfigDir:     filepath.Join(configDir, "headscale"),
 		})
 		err = headscaleServer.Init()
 		if err != nil {
@@ -134,6 +143,10 @@ var ServeCmd = &cobra.Command{
 
 		containerRegistryService := containerregistries.NewContainerRegistryService(containerregistries.ContainerRegistryServiceConfig{
 			Store: containerRegistryStore,
+		})
+
+		projectConfigService := projectconfig.NewConfigService(projectconfig.ProjectConfigServiceConfig{
+			ConfigStore: projectConfigStore,
 		})
 
 		var localContainerRegistry server.ILocalContainerRegistry
@@ -159,6 +172,7 @@ var ServeCmd = &cobra.Command{
 		providerTargetService := providertargets.NewProviderTargetService(providertargets.ProviderTargetServiceConfig{
 			TargetStore: providerTargetStore,
 		})
+
 		apiKeyService := apikeys.NewApiKeyService(apikeys.ApiKeyServiceConfig{
 			ApiKeyStore: apiKeyStore,
 		})
@@ -186,27 +200,15 @@ var ServeCmd = &cobra.Command{
 		}
 		buildImageNamespace = strings.TrimSuffix(buildImageNamespace, "/")
 
-		builderConfig := build.BuilderConfig{
-			ServerConfigFolder:       configDir,
+		builderFactory := build.NewBuilderFactory(build.BuilderFactoryConfig{
 			ContainerRegistryServer:  c.BuilderRegistryServer,
-			BasePath:                 filepath.Join(configDir, "builds"),
 			BuildImageNamespace:      buildImageNamespace,
-			BuildResultStore:         buildResultStore,
+			BuildStore:               buildStore,
 			LoggerFactory:            loggerFactory,
 			DefaultProjectImage:      c.DefaultProjectImage,
 			DefaultProjectUser:       c.DefaultProjectUser,
 			Image:                    c.BuilderImage,
 			ContainerRegistryService: containerRegistryService,
-		}
-
-		builderFactory := build.NewBuilderFactory(build.BuilderFactoryConfig{
-			BuilderConfig: builderConfig,
-			CreateGitService: func(projectDir string, logWriter io.Writer) git.IGitService {
-				return &git.Service{
-					ProjectDir: projectDir,
-					LogWriter:  logWriter,
-				}
-			},
 		})
 
 		provisioner := provisioner.NewProvisioner(provisioner.ProvisionerConfig{
@@ -223,17 +225,33 @@ var ServeCmd = &cobra.Command{
 			ApiKeyService:            apiKeyService,
 			GitProviderService:       gitProviderService,
 			ContainerRegistryService: containerRegistryService,
+			ProjectConfigService:     projectConfigService,
 			ServerApiUrl:             util.GetFrpcApiUrl(c.Frps.Protocol, c.Id, c.Frps.Domain),
 			ServerUrl:                headscaleUrl,
 			DefaultProjectImage:      c.DefaultProjectImage,
 			DefaultProjectUser:       c.DefaultProjectUser,
 			Provisioner:              provisioner,
 			LoggerFactory:            loggerFactory,
-			BuilderFactory:           builderFactory,
 			TelemetryService:         telemetryService,
 		})
+
 		profileDataService := profiledata.NewProfileDataService(profiledata.ProfileDataServiceConfig{
 			ProfileDataStore: profileDataStore,
+		})
+
+		buildRunnerConfig, err := build.GetConfig()
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		buildRunner := build.NewBuildRunner(build.BuildRunnerInstanceConfig{
+			Interval:         buildRunnerConfig.Interval,
+			Scheduler:        build.NewCronScheduler(),
+			BuildRunnerId:    buildRunnerConfig.Id,
+			BuildStore:       buildStore,
+			BuilderFactory:   builderFactory,
+			LoggerFactory:    loggerFactory,
+			TelemetryService: telemetryService,
 		})
 
 		server := server.GetInstance(&server.ServerInstanceConfig{
@@ -241,6 +259,7 @@ var ServeCmd = &cobra.Command{
 			TailscaleServer:          headscaleServer,
 			ProviderTargetService:    providerTargetService,
 			ContainerRegistryService: containerRegistryService,
+			ProjectConfigService:     projectConfigService,
 			LocalContainerRegistry:   localContainerRegistry,
 			ApiKeyService:            apiKeyService,
 			WorkspaceService:         workspaceService,
@@ -257,6 +276,11 @@ var ServeCmd = &cobra.Command{
 			log.Fatal(err)
 		}
 
+		err = buildRunner.Start()
+		if err != nil {
+			log.Fatal(err)
+		}
+
 		go func() {
 			err := apiServer.Start()
 			if err != nil {
@@ -267,6 +291,7 @@ var ServeCmd = &cobra.Command{
 		go func() {
 			err := <-errCh
 			if err != nil {
+				buildRunner.Stop()
 				log.Fatal(err)
 			}
 		}()
@@ -316,19 +341,17 @@ func printServerStartedMessage(c *server.Config, runAsDaemon bool) {
 }
 
 func getDbPath() (string, error) {
-	userConfigDir, err := os.UserConfigDir()
+	configDir, err := config.GetConfigDir()
 	if err != nil {
 		return "", err
 	}
 
-	dir := filepath.Join(userConfigDir, "daytona")
-
-	err = os.MkdirAll(dir, 0755)
+	err = os.MkdirAll(configDir, 0755)
 	if err != nil {
 		return "", err
 	}
 
-	return filepath.Join(dir, "db"), nil
+	return filepath.Join(configDir, "db"), nil
 }
 
 func setDefaultConfig(server *server.Server, apiPort uint32) error {

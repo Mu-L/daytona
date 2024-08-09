@@ -3,7 +3,7 @@ info:
   contact: {}
   description: Daytona Server API
   title: Daytona Server API
-  version: 0.1.0
+  version: v0.0.0-dev
 servers:
 - url: http://localhost:3986/
 security:
@@ -176,6 +176,28 @@ paths:
       tags:
       - gitProvider
       x-codegen-request-body-name: gitProviderConfig
+  /gitprovider/context/url:
+    post:
+      description: Get URL from Git repository
+      operationId: GetUrlFromRepository
+      requestBody:
+        content:
+          '*/*':
+            schema:
+              $ref: '#/components/schemas/GitRepository'
+        description: Git repository
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RepositoryUrl'
+          description: OK
+      summary: Get URL from Git repository
+      tags:
+      - gitProvider
+      x-codegen-request-body-name: repository
   /gitprovider/context/{gitUrl}:
     get:
       description: Get Git context
@@ -216,6 +238,27 @@ paths:
                 $ref: '#/components/schemas/GitProvider'
           description: OK
       summary: Get Git provider
+      tags:
+      - gitProvider
+  /gitprovider/id-for-url/{url}:
+    get:
+      description: Get Git provider ID
+      operationId: GetGitProviderIdForUrl
+      parameters:
+      - description: Url
+        in: path
+        name: url
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            text/plain:
+              schema:
+                type: string
+          description: OK
+      summary: Get Git provider ID
       tags:
       - gitProvider
   /gitprovider/{gitProviderId}:
@@ -421,6 +464,117 @@ paths:
       tags:
       - profile
       x-codegen-request-body-name: profileData
+  /project-config:
+    get:
+      description: List project configs
+      operationId: ListProjectConfigs
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/ProjectConfig'
+                type: array
+          description: OK
+      summary: List project configs
+      tags:
+      - project-config
+    put:
+      description: Set project config data
+      operationId: SetProjectConfig
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateProjectConfigDTO'
+        description: Project config
+        required: true
+      responses:
+        "201":
+          content: {}
+          description: Created
+      summary: Set project config data
+      tags:
+      - project-config
+      x-codegen-request-body-name: projectConfig
+  /project-config/default/{gitUrl}:
+    get:
+      description: Get project configs by git url
+      operationId: GetDefaultProjectConfig
+      parameters:
+      - description: Git URL
+        in: path
+        name: gitUrl
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectConfig'
+          description: OK
+      summary: Get project configs by git url
+      tags:
+      - project-config
+  /project-config/{configName}:
+    delete:
+      description: Delete project config data
+      operationId: DeleteProjectConfig
+      parameters:
+      - description: Config name
+        in: path
+        name: configName
+        required: true
+        schema:
+          type: string
+      responses:
+        "204":
+          content: {}
+          description: No Content
+      summary: Delete project config data
+      tags:
+      - project-config
+    get:
+      description: Get project config data
+      operationId: GetProjectConfig
+      parameters:
+      - description: Config name
+        in: path
+        name: configName
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ProjectConfig'
+          description: OK
+      summary: Get project config data
+      tags:
+      - project-config
+  /project-config/{configName}/set-default:
+    patch:
+      description: Set project config to default
+      operationId: SetDefaultProjectConfig
+      parameters:
+      - description: Config name
+        in: path
+        name: configName
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content: {}
+          description: OK
+      summary: Set project config to default
+      tags:
+      - project-config
   /provider:
     get:
       description: List providers
@@ -625,7 +779,7 @@ paths:
         content:
           '*/*':
             schema:
-              $ref: '#/components/schemas/CreateWorkspaceRequest'
+              $ref: '#/components/schemas/CreateWorkspaceDTO'
         description: Create workspace
         required: true
       responses:
@@ -827,13 +981,66 @@ components:
         username:
           type: string
       type: object
-    CreateWorkspaceRequest:
+    CreateProjectConfigDTO:
+      example:
+        buildConfig:
+          devcontainer:
+            filePath: filePath
+        image: image
+        envVars:
+          key: envVars
+        name: name
+        source:
+          repository:
+            owner: owner
+            path: path
+            name: name
+            id: id
+            source: source
+            prNumber: 0
+            branch: branch
+            sha: sha
+            url: url
+        user: user
+      properties:
+        buildConfig:
+          $ref: '#/components/schemas/ProjectBuildConfig'
+        envVars:
+          additionalProperties:
+            type: string
+          type: object
+        image:
+          type: string
+        name:
+          type: string
+        source:
+          $ref: '#/components/schemas/CreateProjectConfigSourceDTO'
+        user:
+          type: string
+      type: object
+    CreateProjectConfigSourceDTO:
+      example:
+        repository:
+          owner: owner
+          path: path
+          name: name
+          id: id
+          source: source
+          prNumber: 0
+          branch: branch
+          sha: sha
+          url: url
+      properties:
+        repository:
+          $ref: '#/components/schemas/GitRepository'
+      type: object
+    CreateWorkspaceDTO:
       example:
         projects:
-        - image: image
-          build:
+        - buildConfig:
             devcontainer:
-              devContainerFilePath: devContainerFilePath
+              filePath: filePath
+          image: image
           envVars:
             key: envVars
           name: name
@@ -849,10 +1056,10 @@ components:
               sha: sha
               url: url
           user: user
-        - image: image
-          build:
+        - buildConfig:
             devcontainer:
-              devContainerFilePath: devContainerFilePath
+              filePath: filePath
+          image: image
           envVars:
             key: envVars
           name: name
@@ -878,67 +1085,19 @@ components:
           type: string
         projects:
           items:
-            $ref: '#/components/schemas/CreateWorkspaceRequestProject'
+            $ref: '#/components/schemas/CreateProjectConfigDTO'
           type: array
         target:
           type: string
       required:
       - projects
       type: object
-    CreateWorkspaceRequestProject:
+    DevcontainerConfig:
       example:
-        image: image
-        build:
-          devcontainer:
-            devContainerFilePath: devContainerFilePath
-        envVars:
-          key: envVars
-        name: name
-        source:
-          repository:
-            owner: owner
-            path: path
-            name: name
-            id: id
-            source: source
-            prNumber: 0
-            branch: branch
-            sha: sha
-            url: url
-        user: user
+        filePath: filePath
       properties:
-        build:
-          $ref: '#/components/schemas/ProjectBuild'
-        envVars:
-          additionalProperties:
-            type: string
-          type: object
-        image:
+        filePath:
           type: string
-        name:
-          type: string
-        source:
-          $ref: '#/components/schemas/CreateWorkspaceRequestProjectSource'
-        user:
-          type: string
-      required:
-      - name
-      type: object
-    CreateWorkspaceRequestProjectSource:
-      example:
-        repository:
-          owner: owner
-          path: path
-          name: name
-          id: id
-          source: source
-          prNumber: 0
-          branch: branch
-          sha: sha
-          url: url
-      properties:
-        repository:
-          $ref: '#/components/schemas/GitRepository'
       type: object
     FRPSConfig:
       example:
@@ -1129,10 +1288,13 @@ components:
       type: object
     Project:
       example:
-        image: image
-        build:
+        buildConfig:
           devcontainer:
-            devContainerFilePath: devContainerFilePath
+            filePath: filePath
+        image: image
+        default: true
+        envVars:
+          key: envVars
         name: name
         state:
           gitStatus:
@@ -1162,8 +1324,14 @@ components:
         target: target
         workspaceId: workspaceId
       properties:
-        build:
-          $ref: '#/components/schemas/ProjectBuild'
+        buildConfig:
+          $ref: '#/components/schemas/ProjectBuildConfig'
+        default:
+          type: boolean
+        envVars:
+          additionalProperties:
+            type: string
+          type: object
         image:
           type: string
         name:
@@ -1179,19 +1347,51 @@ components:
         workspaceId:
           type: string
       type: object
-    ProjectBuild:
+    ProjectBuildConfig:
       example:
         devcontainer:
-          devContainerFilePath: devContainerFilePath
+          filePath: filePath
       properties:
         devcontainer:
-          $ref: '#/components/schemas/ProjectBuildDevcontainer'
+          $ref: '#/components/schemas/DevcontainerConfig'
       type: object
-    ProjectBuildDevcontainer:
+    ProjectConfig:
       example:
-        devContainerFilePath: devContainerFilePath
+        buildConfig:
+          devcontainer:
+            filePath: filePath
+        image: image
+        default: true
+        envVars:
+          key: envVars
+        name: name
+        repository:
+          owner: owner
+          path: path
+          name: name
+          id: id
+          source: source
+          prNumber: 0
+          branch: branch
+          sha: sha
+          url: url
+        user: user
       properties:
-        devContainerFilePath:
+        buildConfig:
+          $ref: '#/components/schemas/ProjectBuildConfig'
+        default:
+          type: boolean
+        envVars:
+          additionalProperties:
+            type: string
+          type: object
+        image:
+          type: string
+        name:
+          type: string
+        repository:
+          $ref: '#/components/schemas/GitRepository'
+        user:
           type: string
       type: object
     ProjectInfo:
@@ -1265,6 +1465,13 @@ components:
     ProviderTargetManifest:
       additionalProperties:
         $ref: '#/components/schemas/provider.ProviderTargetProperty'
+      type: object
+    RepositoryUrl:
+      example:
+        url: url
+      properties:
+        url:
+          type: string
       type: object
     ServerConfig:
       example:
@@ -1364,10 +1571,13 @@ components:
     Workspace:
       example:
         projects:
-        - image: image
-          build:
+        - buildConfig:
             devcontainer:
-              devContainerFilePath: devContainerFilePath
+              filePath: filePath
+          image: image
+          default: true
+          envVars:
+            key: envVars
           name: name
           state:
             gitStatus:
@@ -1396,10 +1606,13 @@ components:
           user: user
           target: target
           workspaceId: workspaceId
-        - image: image
-          build:
+        - buildConfig:
             devcontainer:
-              devContainerFilePath: devContainerFilePath
+              filePath: filePath
+          image: image
+          default: true
+          envVars:
+            key: envVars
           name: name
           state:
             gitStatus:
@@ -1446,10 +1659,13 @@ components:
     WorkspaceDTO:
       example:
         projects:
-        - image: image
-          build:
+        - buildConfig:
             devcontainer:
-              devContainerFilePath: devContainerFilePath
+              filePath: filePath
+          image: image
+          default: true
+          envVars:
+            key: envVars
           name: name
           state:
             gitStatus:
@@ -1478,10 +1694,13 @@ components:
           user: user
           target: target
           workspaceId: workspaceId
-        - image: image
-          build:
+        - buildConfig:
             devcontainer:
-              devContainerFilePath: devContainerFilePath
+              filePath: filePath
+          image: image
+          default: true
+          envVars:
+            key: envVars
           name: name
           state:
             gitStatus:
