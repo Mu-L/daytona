@@ -1,9 +1,6 @@
 // Copyright 2025 Daytona Platforms Inc.
 // SPDX-License-Identifier: AGPL-3.0
 
-// Copyright 2024 Daytona Platforms Inc.
-// SPDX-License-Identifier: Apache-2.0
-
 package process
 
 import (
@@ -32,6 +29,9 @@ func ExecuteCommand(c *gin.Context) {
 	}
 
 	cmd := exec.Command(cmdParts[0], cmdParts[1:]...)
+	if request.Cwd != nil {
+		cmd.Dir = *request.Cwd
+	}
 
 	// set maximum execution time
 	timeout := 360 * time.Second

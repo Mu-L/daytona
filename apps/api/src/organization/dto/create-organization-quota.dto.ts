@@ -41,16 +41,6 @@ export class CreateOrganizationQuotaDto {
   @ApiPropertyOptional()
   @IsNumber()
   @IsOptional()
-  maxConcurrentWorkspaces?: number
-
-  @ApiPropertyOptional()
-  @IsNumber()
-  @IsOptional()
-  workspaceQuota?: number
-
-  @ApiPropertyOptional()
-  @IsNumber()
-  @IsOptional()
   imageQuota?: number
 
   @ApiPropertyOptional()
@@ -61,5 +51,5 @@ export class CreateOrganizationQuotaDto {
   @ApiPropertyOptional()
   @IsNumber()
   @IsOptional()
-  totalImageSize?: number
+  volumeQuota?: number
 }
