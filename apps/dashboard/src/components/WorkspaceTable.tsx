@@ -48,6 +48,8 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/t
 import { useSelectedOrganization } from '@/hooks/useSelectedOrganization'
 import { DebouncedInput } from './DebouncedInput'
 import { DataTableFacetedFilter, FacetedFilterOption } from './ui/data-table-faceted-filter'
+import { DEFAULT_PAGE_SIZE } from '@/constants/Pagination'
+import { TableEmptyState } from './TableEmptyState'
 
 interface DataTableProps {
   data: Workspace[]
@@ -82,7 +84,16 @@ export function WorkspaceTable({
     [authenticatedUserHasPermission],
   )
 
-  const [sorting, setSorting] = useState<SortingState>([])
+  const [sorting, setSorting] = useState<SortingState>([
+    {
+      id: 'state',
+      desc: false,
+    },
+    {
+      id: 'lastEvent',
+      desc: true,
+    },
+  ])
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
 
   const labelOptions: FacetedFilterOption[] = useMemo(() => {
@@ -121,6 +132,11 @@ export function WorkspaceTable({
     },
     enableRowSelection: true,
     getRowId: (row) => row.id,
+    initialState: {
+      pagination: {
+        pageSize: DEFAULT_PAGE_SIZE,
+      },
+    },
   })
   const [bulkDeleteConfirmationOpen, setBulkDeleteConfirmationOpen] = useState(false)
 
@@ -180,13 +196,7 @@ export function WorkspaceTable({
                 </TableRow>
               ))
             ) : (
-              !loading && (
-                <TableRow>
-                  <TableCell colSpan={columns.length} className="h-24 text-center">
-                    No results.
-                  </TableCell>
-                </TableRow>
-              )
+              <TableEmptyState colSpan={columns.length} message="No Sandboxes found." />
             )}
           </TableBody>
         </Table>
@@ -229,7 +239,7 @@ export function WorkspaceTable({
             </div>
           )}
         </div>
-        <Pagination table={table} selectionEnabled />
+        <Pagination table={table} selectionEnabled entityName="Sandboxes" />
       </div>
     </div>
   )
@@ -448,6 +458,34 @@ const getColumns = ({
         )
       },
       accessorKey: 'state',
+      sortingFn: (rowA, rowB) => {
+        const statePriorityOrder = {
+          [WorkspaceState.STARTED]: 1,
+          [WorkspaceState.BUILDING_IMAGE]: 2,
+          [WorkspaceState.PENDING_BUILD]: 2,
+          [WorkspaceState.RESTORING]: 3,
+          [WorkspaceState.ERROR]: 4,
+          [WorkspaceState.STOPPED]: 5,
+          [WorkspaceState.ARCHIVING]: 6,
+          [WorkspaceState.ARCHIVED]: 6,
+          [WorkspaceState.CREATING]: 7,
+          [WorkspaceState.STARTING]: 7,
+          [WorkspaceState.STOPPING]: 7,
+          [WorkspaceState.DESTROYING]: 7,
+          [WorkspaceState.DESTROYED]: 7,
+          [WorkspaceState.PULLING_IMAGE]: 7,
+          [WorkspaceState.UNKNOWN]: 7,
+        }
+
+        const stateA = rowA.original.state || WorkspaceState.UNKNOWN
+        const stateB = rowB.original.state || WorkspaceState.UNKNOWN
+
+        if (stateA === stateB) {
+          return 0
+        }
+
+        return statePriorityOrder[stateA] - statePriorityOrder[stateB]
+      },
       filterFn: (row, id, value) => {
         return value.includes(row.getValue(id))
       },

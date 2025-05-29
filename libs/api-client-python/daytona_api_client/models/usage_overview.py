@@ -23,34 +23,35 @@ from typing import Any, ClassVar, Dict, List, Union
 from typing import Optional, Set
 from typing_extensions import Self
 
+
 class UsageOverview(BaseModel):
     """
     UsageOverview
-    """ # noqa: E501
+    """  # noqa: E501
+
     total_cpu_quota: Union[StrictFloat, StrictInt] = Field(alias="totalCpuQuota")
     total_gpu_quota: Union[StrictFloat, StrictInt] = Field(alias="totalGpuQuota")
     total_memory_quota: Union[StrictFloat, StrictInt] = Field(alias="totalMemoryQuota")
     total_disk_quota: Union[StrictFloat, StrictInt] = Field(alias="totalDiskQuota")
-    total_workspace_quota: Union[StrictFloat, StrictInt] = Field(alias="totalWorkspaceQuota")
-    concurrent_workspace_quota: Union[StrictFloat, StrictInt] = Field(alias="concurrentWorkspaceQuota")
     current_cpu_usage: Union[StrictFloat, StrictInt] = Field(alias="currentCpuUsage")
     current_memory_usage: Union[StrictFloat, StrictInt] = Field(alias="currentMemoryUsage")
     current_disk_usage: Union[StrictFloat, StrictInt] = Field(alias="currentDiskUsage")
-    current_workspaces: Union[StrictFloat, StrictInt] = Field(alias="currentWorkspaces")
-    concurrent_workspaces: Union[StrictFloat, StrictInt] = Field(alias="concurrentWorkspaces")
-    current_image_number: Union[StrictFloat, StrictInt] = Field(alias="currentImageNumber")
-    image_quota: Union[StrictFloat, StrictInt] = Field(alias="imageQuota")
-    total_image_size_quota: Union[StrictFloat, StrictInt] = Field(alias="totalImageSizeQuota")
-    total_image_size_used: Union[StrictFloat, StrictInt] = Field(alias="totalImageSizeUsed")
     additional_properties: Dict[str, Any] = {}
-    __properties: ClassVar[List[str]] = ["totalCpuQuota", "totalGpuQuota", "totalMemoryQuota", "totalDiskQuota", "totalWorkspaceQuota", "concurrentWorkspaceQuota", "currentCpuUsage", "currentMemoryUsage", "currentDiskUsage", "currentWorkspaces", "concurrentWorkspaces", "currentImageNumber", "imageQuota", "totalImageSizeQuota", "totalImageSizeUsed"]
+    __properties: ClassVar[List[str]] = [
+        "totalCpuQuota",
+        "totalGpuQuota",
+        "totalMemoryQuota",
+        "totalDiskQuota",
+        "currentCpuUsage",
+        "currentMemoryUsage",
+        "currentDiskUsage",
+    ]
 
     model_config = ConfigDict(
         populate_by_name=True,
         validate_assignment=True,
         protected_namespaces=(),
     )
-
 
     def to_str(self) -> str:
         """Returns the string representation of the model using alias"""
@@ -77,9 +78,11 @@ class UsageOverview(BaseModel):
           are ignored.
         * Fields in `self.additional_properties` are added to the output dict.
         """
-        excluded_fields: Set[str] = set([
-            "additional_properties",
-        ])
+        excluded_fields: Set[str] = set(
+            [
+                "additional_properties",
+            ]
+        )
 
         _dict = self.model_dump(
             by_alias=True,
@@ -102,28 +105,20 @@ class UsageOverview(BaseModel):
         if not isinstance(obj, dict):
             return cls.model_validate(obj)
 
-        _obj = cls.model_validate({
-            "totalCpuQuota": obj.get("totalCpuQuota"),
-            "totalGpuQuota": obj.get("totalGpuQuota"),
-            "totalMemoryQuota": obj.get("totalMemoryQuota"),
-            "totalDiskQuota": obj.get("totalDiskQuota"),
-            "totalWorkspaceQuota": obj.get("totalWorkspaceQuota"),
-            "concurrentWorkspaceQuota": obj.get("concurrentWorkspaceQuota"),
-            "currentCpuUsage": obj.get("currentCpuUsage"),
-            "currentMemoryUsage": obj.get("currentMemoryUsage"),
-            "currentDiskUsage": obj.get("currentDiskUsage"),
-            "currentWorkspaces": obj.get("currentWorkspaces"),
-            "concurrentWorkspaces": obj.get("concurrentWorkspaces"),
-            "currentImageNumber": obj.get("currentImageNumber"),
-            "imageQuota": obj.get("imageQuota"),
-            "totalImageSizeQuota": obj.get("totalImageSizeQuota"),
-            "totalImageSizeUsed": obj.get("totalImageSizeUsed")
-        })
+        _obj = cls.model_validate(
+            {
+                "totalCpuQuota": obj.get("totalCpuQuota"),
+                "totalGpuQuota": obj.get("totalGpuQuota"),
+                "totalMemoryQuota": obj.get("totalMemoryQuota"),
+                "totalDiskQuota": obj.get("totalDiskQuota"),
+                "currentCpuUsage": obj.get("currentCpuUsage"),
+                "currentMemoryUsage": obj.get("currentMemoryUsage"),
+                "currentDiskUsage": obj.get("currentDiskUsage"),
+            }
+        )
         # store additional fields in additional_properties
         for _key in obj.keys():
             if _key not in cls.__properties:
                 _obj.additional_properties[_key] = obj.get(_key)
 
         return _obj
-
-

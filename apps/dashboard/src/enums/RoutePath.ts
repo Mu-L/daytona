@@ -20,7 +20,8 @@ export enum RoutePath {
   SANDBOXES = '/dashboard/sandboxes',
   IMAGES = '/dashboard/images',
   REGISTRIES = '/dashboard/registries',
-  USAGE = '/dashboard/usage',
+  VOLUMES = '/dashboard/volumes',
+  LIMITS = '/dashboard/limits',
   BILLING = '/dashboard/billing',
   MEMBERS = '/dashboard/members',
   ROLES = '/dashboard/roles',
@@ -29,6 +30,7 @@ export enum RoutePath {
 
   // User routes
   USER_INVITATIONS = '/dashboard/user/invitations',
+  LINKED_ACCOUNTS = '/dashboard/user/linked-accounts',
 }
 
 /**

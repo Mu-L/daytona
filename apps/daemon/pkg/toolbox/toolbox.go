@@ -1,9 +1,6 @@
 // Copyright 2025 Daytona Platforms Inc.
 // SPDX-License-Identifier: AGPL-3.0
 
-// Copyright 2024 Daytona Platforms Inc.
-// SPDX-License-Identifier: Apache-2.0
-
 package toolbox
 
 import (
@@ -87,6 +84,7 @@ func (s *Server) Start() error {
 		fsController.POST("/permissions", fs.SetFilePermissions)
 		fsController.POST("/replace", fs.ReplaceInFiles)
 		fsController.POST("/upload", fs.UploadFile)
+		fsController.POST("/bulk-upload", fs.UploadFiles)
 
 		// delete operations
 		fsController.DELETE("/", fs.DeleteFile)
@@ -96,15 +94,16 @@ func (s *Server) Start() error {
 	{
 		processController.POST("/execute", process.ExecuteCommand)
 
-		sessionController := processController.Group("/session")
+		sessionController := session.NewSessionController(s.ProjectDir, configDir)
+		sessionGroup := processController.Group("/session")
 		{
-			sessionController.GET("", session.ListSessions)
-			sessionController.POST("", session.CreateSession(s.ProjectDir, configDir))
-			sessionController.POST("/:sessionId/exec", session.SessionExecuteCommand(configDir))
-			sessionController.GET("/:sessionId", session.GetSession)
-			sessionController.DELETE("/:sessionId", session.DeleteSession(configDir))
-			sessionController.GET("/:sessionId/command/:commandId", session.GetSessionCommand)
-			sessionController.GET("/:sessionId/command/:commandId/logs", session.GetSessionCommandLogs(configDir))
+			sessionGroup.GET("", sessionController.ListSessions)
+			sessionGroup.POST("", sessionController.CreateSession)
+			sessionGroup.POST("/:sessionId/exec", sessionController.SessionExecuteCommand)
+			sessionGroup.GET("/:sessionId", sessionController.GetSession)
+			sessionGroup.DELETE("/:sessionId", sessionController.DeleteSession)
+			sessionGroup.GET("/:sessionId/command/:commandId", sessionController.GetSessionCommand)
+			sessionGroup.GET("/:sessionId/command/:commandId/logs", sessionController.GetSessionCommandLogs)
 		}
 	}
 
@@ -117,6 +116,7 @@ func (s *Server) Start() error {
 		gitController.POST("/add", git.AddFiles)
 		gitController.POST("/branches", git.CreateBranch)
 		gitController.POST("/checkout", git.CheckoutBranch)
+		gitController.DELETE("/branches", git.DeleteBranch)
 		gitController.POST("/clone", git.CloneRepository)
 		gitController.POST("/commit", git.CommitChanges)
 		gitController.POST("/pull", git.PullChanges)

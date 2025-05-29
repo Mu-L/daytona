@@ -96,6 +96,15 @@ export class GitBranchRequestDto {
   name: string
 }
 
+@ApiSchema({ name: 'GitDeleteBranchRequest' })
+export class GitDeleteBranchRequestDto {
+  @ApiProperty()
+  path: string
+
+  @ApiProperty()
+  name: string
+}
+
 @ApiSchema({ name: 'GitCloneRequest' })
 export class GitCloneRequestDto {
   @ApiProperty()
@@ -136,6 +145,15 @@ export class GitCommitRequestDto {
 export class GitCommitResponseDto {
   @ApiProperty()
   hash: string
+}
+
+@ApiSchema({ name: 'GitCheckoutRequest' })
+export class GitCheckoutRequestDto {
+  @ApiProperty()
+  path: string
+
+  @ApiProperty()
+  branch: string
 }
 
 @ApiSchema({ name: 'GitRepoRequest' })

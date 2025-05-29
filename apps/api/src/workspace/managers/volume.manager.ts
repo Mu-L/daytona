@@ -19,7 +19,7 @@ import { deleteS3Bucket } from '../../common/utils/delete-s3-bucket'
 const VOLUME_STATE_LOCK_KEY = 'volume-state-'
 
 @Injectable()
-export class VolumeManager {
+export class VolumeManager implements OnModuleInit {
   private readonly logger = new Logger(VolumeManager.name)
   private processingVolumes: Set<string> = new Set()
   private skipTestConnection: boolean
@@ -75,7 +75,7 @@ export class VolumeManager {
     try {
       // Lock the entire process
       const lockKey = 'process-pending-volumes'
-      if (await this.redisLockProvider.lock(lockKey, 30)) {
+      if (!(await this.redisLockProvider.lock(lockKey, 30))) {
         return
       }
 
@@ -93,18 +93,17 @@ export class VolumeManager {
 
           // Get lock for this specific volume
           const volumeLockKey = `${VOLUME_STATE_LOCK_KEY}${volume.id}`
-          const hasLock = await this.redis.get(volumeLockKey)
-          if (hasLock) {
+          const acquired = await this.redisLockProvider.lock(volumeLockKey, 30)
+          if (!acquired) {
             return
           }
 
           try {
             this.processingVolumes.add(volume.id)
-            await this.redis.setex(volumeLockKey, 30, '1')
             await this.processVolumeState(volume)
           } finally {
             this.processingVolumes.delete(volume.id)
-            await this.redis.del(volumeLockKey)
+            await this.redisLockProvider.unlock(volumeLockKey)
           }
         }),
       )
@@ -142,7 +141,10 @@ export class VolumeManager {
       await this.redis.setex(lockKey, 30, '1')
 
       // Update state to CREATING
-      await this.volumeRepository.update(volume.id, { state: VolumeState.CREATING })
+      await this.volumeRepository.save({
+        ...volume,
+        state: VolumeState.CREATING,
+      })
 
       // Refresh lock before S3 operation
       await this.redis.setex(lockKey, 30, '1')
@@ -180,11 +182,18 @@ export class VolumeManager {
       await this.redis.setex(lockKey, 30, '1')
 
       // Update volume state to READY
-      await this.volumeRepository.update(volume.id, { state: VolumeState.READY })
+      await this.volumeRepository.save({
+        ...volume,
+        state: VolumeState.READY,
+      })
       this.logger.debug(`Volume ${volume.id} created successfully`)
     } catch (error) {
       this.logger.error(`Error creating volume ${volume.id}:`, error)
-      await this.volumeRepository.update(volume.id, { state: VolumeState.ERROR, errorReason: error.message })
+      await this.volumeRepository.save({
+        ...volume,
+        state: VolumeState.ERROR,
+        errorReason: error.message,
+      })
     }
   }
 
@@ -194,8 +203,10 @@ export class VolumeManager {
       await this.redis.setex(lockKey, 30, '1')
 
       // Update state to DELETING
-      volume.state = VolumeState.DELETING
-      await this.volumeRepository.update(volume.id, { state: VolumeState.DELETING })
+      await this.volumeRepository.save({
+        ...volume,
+        state: VolumeState.DELETING,
+      })
 
       // Refresh lock before S3 operation
       await this.redis.setex(lockKey, 30, '1')
@@ -214,11 +225,16 @@ export class VolumeManager {
       })
 
       // Update volume state to DELETED and rename
-      await this.volumeRepository.update(volume.id, { state: VolumeState.DELETED, name: `${volume.name}-deleted` })
+      await this.volumeRepository.save({
+        ...volume,
+        state: VolumeState.DELETED,
+        name: `${volume.name}-deleted`,
+      })
       this.logger.debug(`Volume ${volume.id} deleted successfully`)
     } catch (error) {
       this.logger.error(`Error deleting volume ${volume.id}:`, error)
-      await this.volumeRepository.update(volume.id, {
+      await this.volumeRepository.save({
+        ...volume,
         state: VolumeState.ERROR,
         errorReason: error.message,
       })

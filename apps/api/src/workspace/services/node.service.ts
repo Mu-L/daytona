@@ -6,7 +6,7 @@
 import { Injectable, Logger } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Cron } from '@nestjs/schedule'
-import { In, Not, Repository } from 'typeorm'
+import { FindOptionsWhere, In, Not, Raw, Repository } from 'typeorm'
 import { Node } from '../entities/node.entity'
 import { CreateNodeDto } from '../dto/create-node.dto'
 import { WorkspaceClass } from '../enums/workspace-class.enum'
@@ -21,7 +21,6 @@ import { WorkspaceState } from './../../workspace/enums/workspace-state.enum'
 import { Workspace } from './../../workspace/entities/workspace.entity'
 import { ImageNode } from './../../workspace/entities/image-node.entity'
 import { ImageNodeState } from './../../workspace/enums/image-node-state.enum'
-import { ImageManager } from '../managers/image.manager'
 
 @Injectable()
 export class NodeService {
@@ -36,7 +35,6 @@ export class NodeService {
     private readonly workspaceRepository: Repository<Workspace>,
     @InjectRepository(ImageNode)
     private readonly imageNodeRepository: Repository<ImageNode>,
-    private readonly imageStateManager: ImageManager,
   ) {}
 
   async create(createNodeDto: CreateNodeDto): Promise<Node> {
@@ -73,29 +71,49 @@ export class NodeService {
     return this.nodeRepository.findOneBy({ id })
   }
 
-  async findAvailableNodes(region: NodeRegion, workspaceClass: WorkspaceClass, imageRef?: string): Promise<Node[]> {
-    const whereCondition: any = {
-      state: ImageNodeState.READY,
+  async findAvailableNodes(params: GetNodeParams): Promise<Node[]> {
+    const nodeFilter: FindOptionsWhere<Node> = {
+      state: NodeState.READY,
+      unschedulable: Not(true),
+      used: Raw((alias) => `${alias} < capacity`),
     }
 
-    if (imageRef !== undefined) {
-      whereCondition.imageRef = imageRef
+    if (params.imageRef !== undefined) {
+      const imageNodes = await this.imageNodeRepository.find({
+        where: {
+          state: ImageNodeState.READY,
+          imageRef: params.imageRef,
+        },
+      })
+
+      let nodeIds = imageNodes.map((imageNode) => imageNode.nodeId)
+
+      if (params.excludedNodeIds?.length) {
+        nodeIds = nodeIds.filter((id) => !params.excludedNodeIds.includes(id))
+      }
+
+      if (!nodeIds.length) {
+        return []
+      }
+
+      nodeFilter.id = In(nodeIds)
+    } else if (params.excludedNodeIds?.length) {
+      nodeFilter.id = Not(In(params.excludedNodeIds))
     }
 
-    const imageNodes = await this.imageNodeRepository.find({
-      where: whereCondition,
+    if (params.region !== undefined) {
+      nodeFilter.region = params.region
+    }
+
+    if (params.workspaceClass !== undefined) {
+      nodeFilter.class = params.workspaceClass
+    }
+
+    const nodes = await this.nodeRepository.find({
+      where: nodeFilter,
     })
 
-    const nodes = this.nodeRepository.find({
-      where: {
-        id: In(imageNodes.map((imageNode) => imageNode.nodeId)),
-        state: NodeState.READY,
-        region,
-        class: workspaceClass,
-        unschedulable: Not(true),
-      },
-    })
-    return (await nodes).filter((node) => node.used < node.capacity)
+    return nodes.sort((a, b) => a.used / a.capacity - b.used / b.capacity).slice(0, 10)
   }
 
   async remove(id: string): Promise<void> {
@@ -186,8 +204,8 @@ export class NodeService {
     return this.nodeRepository.save(node)
   }
 
-  async getRandomAvailableNode(region: NodeRegion, workspaceClass: WorkspaceClass, imageRef?: string): Promise<string> {
-    const availableNodes = await this.findAvailableNodes(region, workspaceClass, imageRef)
+  async getRandomAvailableNode(params: GetNodeParams): Promise<string> {
+    const availableNodes = await this.findAvailableNodes(params)
 
     //  TODO: implement a better algorithm to get a random available node based on the node's usage
 
@@ -231,8 +249,25 @@ export class NodeService {
       imageNode.errorReason = errorReason
     }
     await this.imageNodeRepository.save(imageNode)
-    if (state != ImageNodeState.ERROR) {
-      this.imageStateManager.syncNodeImageState(imageNode)
-    }
   }
+
+  async getNodesWithMultipleImagesBuilding(maxImageCount = 2): Promise<string[]> {
+    const nodes = await this.workspaceRepository
+      .createQueryBuilder('workspace')
+      .select('workspace.nodeId')
+      .where('workspace.state = :state', { state: WorkspaceState.BUILDING_IMAGE })
+      .andWhere('workspace.buildInfoImageRef IS NOT NULL')
+      .groupBy('workspace.nodeId')
+      .having('COUNT(DISTINCT workspace.buildInfoImageRef) > :maxImageCount', { maxImageCount })
+      .getRawMany()
+
+    return nodes.map((item) => item.nodeId)
+  }
+}
+
+export class GetNodeParams {
+  region?: NodeRegion
+  workspaceClass?: WorkspaceClass
+  imageRef?: string
+  excludedNodeIds?: string[]
 }

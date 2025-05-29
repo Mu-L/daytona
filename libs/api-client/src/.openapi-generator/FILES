@@ -17,6 +17,7 @@ common.ts
 configuration.ts
 git_push.sh
 index.ts
+models/account-provider.ts
 models/api-key-list.ts
 models/api-key-response.ts
 models/build-image.ts
@@ -44,10 +45,12 @@ models/file-info.ts
 models/file-status.ts
 models/git-add-request.ts
 models/git-branch-request.ts
+models/git-checkout-request.ts
 models/git-clone-request.ts
 models/git-commit-info.ts
 models/git-commit-request.ts
 models/git-commit-response.ts
+models/git-delete-branch-request.ts
 models/git-repo-request.ts
 models/git-status.ts
 models/image-dto.ts
@@ -90,6 +93,7 @@ models/usage-overview.ts
 models/user-public-key.ts
 models/user.ts
 models/volume-dto.ts
+models/volume-state.ts
 models/workspace-info.ts
 models/workspace-labels.ts
 models/workspace-state.ts

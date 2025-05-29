@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: AGPL-3.0
  */
 
-import React, { Suspense, useEffect, useState } from 'react'
+import React, { Suspense, useEffect } from 'react'
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import Dashboard from './pages/Dashboard'
 import Workspaces from './pages/Workspaces'
@@ -14,7 +14,14 @@ import LoadingFallback from './components/LoadingFallback'
 import Images from './pages/Images'
 import Registries from './pages/Registries'
 import { usePostHog } from 'posthog-js/react'
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './components/ui/dialog'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from './components/ui/dialog'
 import { OrganizationsProvider } from '@/providers/OrganizationsProvider'
 import { SelectedOrganizationProvider } from '@/providers/SelectedOrganizationProvider'
 import { UserOrganizationInvitationsProvider } from '@/providers/UserOrganizationInvitationsProvider'
@@ -22,8 +29,8 @@ import { useSelectedOrganization } from '@/hooks/useSelectedOrganization'
 import OrganizationMembers from '@/pages/OrganizationMembers'
 import OrganizationSettings from '@/pages/OrganizationSettings'
 import UserOrganizationInvitations from '@/pages/UserOrganizationInvitations'
-import { OrganizationUserRoleEnum } from '@daytonaio/api-client'
-import Usage from './pages/Usage'
+import { OrganizationRolePermissionsEnum, OrganizationUserRoleEnum } from '@daytonaio/api-client'
+import Limits from './pages/Limits'
 import Billing from './pages/Billing'
 import { NotificationSocketProvider } from '@/providers/NotificationSocketProvider'
 import { ApiProvider } from './providers/ApiProvider'
@@ -32,6 +39,10 @@ import Logout from './pages/Logout'
 import { RoutePath, getRouteSubPath } from './enums/RoutePath'
 import { DAYTONA_DOCS_URL, DAYTONA_SLACK_URL } from './constants/ExternalLinks'
 import Onboarding from '@/pages/Onboarding'
+import LinkedAccounts from '@/pages/LinkedAccounts'
+import { Button } from './components/ui/button'
+import Volumes from './pages/Volumes'
+import NotFound from './pages/NotFound'
 
 // Simple redirection components for external URLs
 const DocsRedirect = () => {
@@ -53,8 +64,7 @@ const SlackRedirect = () => {
 function App() {
   const location = useLocation()
   const posthog = usePostHog()
-  const { error, isAuthenticated, user } = useAuth()
-  const [errorDialogOpen, setErrorDialogOpen] = useState(false)
+  const { error: authError, isAuthenticated, user, signoutRedirect } = useAuth()
 
   useEffect(() => {
     if (import.meta.env.PROD && isAuthenticated && user && posthog?.get_distinct_id() !== user.profile.sub) {
@@ -74,31 +84,24 @@ function App() {
     }
   }, [location, posthog])
 
-  useEffect(() => {
-    if (error) {
-      if (error.message === 'User not found in waitlist.') {
-        window.location.href = 'https://www.daytona.io/failed-signup'
-        return
-      }
-
-      setErrorDialogOpen(true)
-    }
-  }, [error])
-
-  const [errorTitle, errorDescription] = error?.message.startsWith(`You're currently`)
-    ? [error.message.split('\n')[0], error.message.split('\n').slice(1).join('\n')]
-    : ['Authentication Error', error?.message]
+  if (authError) {
+    return (
+      <Dialog open>
+        <DialogContent className="[&>button]:hidden">
+          <DialogHeader>
+            <DialogTitle>Authentication Error</DialogTitle>
+            <DialogDescription>{authError.message}</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button onClick={() => signoutRedirect()}>Go Back</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    )
+  }
 
   return (
     <ThemeProvider>
-      <Dialog open={errorDialogOpen} onOpenChange={setErrorDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{errorTitle}</DialogTitle>
-            <DialogDescription>{errorDescription}</DialogDescription>
-          </DialogHeader>
-        </DialogContent>
-      </Dialog>
       <Routes>
         <Route path={RoutePath.LANDING} element={<LandingPage />} />
         <Route path={RoutePath.LOGOUT} element={<Logout />} />
@@ -130,7 +133,24 @@ function App() {
           <Route path={getRouteSubPath(RoutePath.SANDBOXES)} element={<Workspaces />} />
           <Route path={getRouteSubPath(RoutePath.IMAGES)} element={<Images />} />
           <Route path={getRouteSubPath(RoutePath.REGISTRIES)} element={<Registries />} />
-          <Route path={getRouteSubPath(RoutePath.USAGE)} element={<Usage />} />
+          <Route
+            path={getRouteSubPath(RoutePath.VOLUMES)}
+            element={
+              <RequiredPermissionsOrganizationPageWrapper
+                requiredPermissions={[OrganizationRolePermissionsEnum.READ_VOLUMES]}
+              >
+                <Volumes />
+              </RequiredPermissionsOrganizationPageWrapper>
+            }
+          />
+          <Route
+            path={getRouteSubPath(RoutePath.LIMITS)}
+            element={
+              <OwnerAccessOrganizationPageWrapper>
+                <Limits />
+              </OwnerAccessOrganizationPageWrapper>
+            }
+          />
           {import.meta.env.VITE_BILLING_API_URL && (
             <Route
               path={getRouteSubPath(RoutePath.BILLING)}
@@ -163,10 +183,13 @@ function App() {
           /> */
           }
           <Route path={getRouteSubPath(RoutePath.SETTINGS)} element={<OrganizationSettings />} />
+          {import.meta.env.VITE_LINKED_ACCOUNTS_ENABLED === 'true' && (
+            <Route path={getRouteSubPath(RoutePath.LINKED_ACCOUNTS)} element={<LinkedAccounts />} />
+          )}
           <Route path={getRouteSubPath(RoutePath.USER_INVITATIONS)} element={<UserOrganizationInvitations />} />
           <Route path={getRouteSubPath(RoutePath.ONBOARDING)} element={<Onboarding />} />
         </Route>
-        {/* Add other routes as needed */}
+        <Route path="*" element={<NotFound />} />
       </Routes>
     </ThemeProvider>
   )
@@ -179,7 +202,7 @@ function NonPersonalOrganizationPageWrapper({ children }: { children: React.Reac
     return <Navigate to={RoutePath.DASHBOARD} replace />
   }
 
-  return <>{children}</>
+  return children
 }
 
 function OwnerAccessOrganizationPageWrapper({ children }: { children: React.ReactNode }) {
@@ -189,7 +212,23 @@ function OwnerAccessOrganizationPageWrapper({ children }: { children: React.Reac
     return <Navigate to={RoutePath.DASHBOARD} replace />
   }
 
-  return <>{children}</>
+  return children
+}
+
+function RequiredPermissionsOrganizationPageWrapper({
+  children,
+  requiredPermissions,
+}: {
+  children: React.ReactNode
+  requiredPermissions: OrganizationRolePermissionsEnum[]
+}) {
+  const { authenticatedUserHasPermission } = useSelectedOrganization()
+
+  if (!requiredPermissions.every((permission) => authenticatedUserHasPermission(permission))) {
+    return <Navigate to={RoutePath.DASHBOARD} replace />
+  }
+
+  return children
 }
 
 export default App

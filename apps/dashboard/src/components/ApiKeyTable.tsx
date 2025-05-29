@@ -29,6 +29,9 @@ import {
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip'
 import { Pagination } from './Pagination'
 import { Loader2 } from 'lucide-react'
+import { DEFAULT_PAGE_SIZE } from '@/constants/Pagination'
+import { getRelativeTimeString } from '@/lib/utils'
+import { TableEmptyState } from './TableEmptyState'
 
 interface DataTableProps {
   data: ApiKeyList[]
@@ -49,6 +52,11 @@ export function ApiKeyTable({ data, loading, loadingKeys, onRevoke }: DataTableP
     getSortedRowModel: getSortedRowModel(),
     state: {
       sorting,
+    },
+    initialState: {
+      pagination: {
+        pageSize: DEFAULT_PAGE_SIZE,
+      },
     },
   })
 
@@ -89,18 +97,12 @@ export function ApiKeyTable({ data, loading, loadingKeys, onRevoke }: DataTableP
                 </TableRow>
               ))
             ) : (
-              !loading && (
-                <TableRow>
-                  <TableCell colSpan={columns.length} className="h-24 text-center">
-                    No results.
-                  </TableCell>
-                </TableRow>
-              )
+              <TableEmptyState colSpan={columns.length} message="No API Keys found." />
             )}
           </TableBody>
         </Table>
       </div>
-      <Pagination table={table} className="mt-4" />
+      <Pagination table={table} className="mt-4" entityName="API Keys" />
     </div>
   )
 }
@@ -148,7 +150,14 @@ const getColumns = ({
       accessorKey: 'createdAt',
       header: 'Created',
       cell: ({ row }) => {
-        return new Date(row.original.createdAt).toLocaleDateString()
+        return getRelativeTimeString(row.original.createdAt).relativeTimeString
+      },
+    },
+    {
+      accessorKey: 'lastUsedAt',
+      header: 'Last Used',
+      cell: ({ row }) => {
+        return getRelativeTimeString(row.original.lastUsedAt).relativeTimeString
       },
     },
     {

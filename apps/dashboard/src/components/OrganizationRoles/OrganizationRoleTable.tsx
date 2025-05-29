@@ -22,6 +22,8 @@ import { TableHeader, TableRow, TableHead, TableBody, TableCell, Table } from '@
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { DeleteOrganizationRoleDialog } from '@/components/OrganizationRoles/DeleteOrganizationRoleDialog'
 import { UpdateOrganizationRoleDialog } from '@/components/OrganizationRoles/UpdateOrganizationRoleDialog'
+import { DEFAULT_PAGE_SIZE } from '@/constants/Pagination'
+import { TableEmptyState } from '../TableEmptyState'
 
 interface DataTableProps {
   data: OrganizationRole[]
@@ -69,6 +71,11 @@ export function OrganizationRoleTable({
     getSortedRowModel: getSortedRowModel(),
     state: {
       sorting,
+    },
+    initialState: {
+      pagination: {
+        pageSize: DEFAULT_PAGE_SIZE,
+      },
     },
   })
 
@@ -138,16 +145,12 @@ export function OrganizationRoleTable({
                   </TableRow>
                 ))
               ) : (
-                <TableRow>
-                  <TableCell colSpan={columns.length} className="h-24 text-center">
-                    No results.
-                  </TableCell>
-                </TableRow>
+                <TableEmptyState colSpan={columns.length} message="No Roles found." />
               )}
             </TableBody>
           </Table>
         </div>
-        <Pagination table={table} className="mt-4" />
+        <Pagination table={table} className="mt-4" entityName="Roles" />
       </div>
 
       {roleToUpdate && (

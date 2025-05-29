@@ -1,15 +1,13 @@
 // Copyright 2025 Daytona Platforms Inc.
 // SPDX-License-Identifier: AGPL-3.0
 
-// Copyright 2024 Daytona Platforms Inc.
-// SPDX-License-Identifier: Apache-2.0
-
 package util
 
 import (
 	"bufio"
 	"context"
 	"io"
+	"time"
 )
 
 func ReadLog(ctx context.Context, logReader io.Reader, follow bool, c chan []byte, errChan chan error) {
@@ -25,10 +23,13 @@ func ReadLog(ctx context.Context, logReader io.Reader, follow bool, c chan []byt
 			if err != nil {
 				if err != io.EOF {
 					errChan <- err
+					return
 				} else if !follow {
 					errChan <- io.EOF
 					return
 				}
+				// Sleep for a short time to avoid busy-waiting
+				time.Sleep(20 * time.Millisecond)
 				continue
 			}
 			c <- bytes

@@ -76,7 +76,7 @@ export class WorkspaceWarmPoolService {
       ],
     })
     if (!image) {
-      throw new BadRequestError(`Image ${workspaceImage} not found or not accessible`)
+      throw new BadRequestError(`Image ${workspaceImage} not found. Did you add it through the Daytona Dashboard?`)
     }
 
     //  check if workspace is warm pool
@@ -122,10 +122,9 @@ export class WorkspaceWarmPoolService {
       let warmPoolWorkspace: Workspace | null = null
       for (const workspace of warmPoolWorkspaces) {
         const lockKey = `workspace-warm-pool-${workspace.id}`
-        if (await this.redis.get(lockKey)) {
+        if (!(await this.redisLockProvider.lock(lockKey, 10))) {
           continue
         }
-        await this.redis.setex(lockKey, 10, '1')
 
         warmPoolWorkspace = workspace
         break
@@ -145,7 +144,7 @@ export class WorkspaceWarmPoolService {
     await Promise.all(
       warmPoolItems.map(async (warmPoolItem) => {
         const lockKey = `warm-pool-lock-${warmPoolItem.id}`
-        if (await this.redisLockProvider.lock(lockKey, 720)) {
+        if (!(await this.redisLockProvider.lock(lockKey, 720))) {
           return
         }
 
@@ -168,11 +167,17 @@ export class WorkspaceWarmPoolService {
 
         const missingCount = warmPoolItem.pool - workspaceCount
         if (missingCount > 0) {
+          const promises = []
           this.logger.debug(`Creating ${missingCount} workspaces for warm pool id ${warmPoolItem.id}`)
 
           for (let i = 0; i < missingCount; i++) {
-            this.eventEmitter.emit(WarmPoolEvents.TOPUP_REQUESTED, new WarmPoolTopUpRequested(warmPoolItem))
+            promises.push(
+              this.eventEmitter.emitAsync(WarmPoolEvents.TOPUP_REQUESTED, new WarmPoolTopUpRequested(warmPoolItem)),
+            )
           }
+
+          // Wait for all promises to settle before releasing the lock. Otherwise, another worker could start creating workspaces
+          await Promise.allSettled(promises)
         }
 
         await this.redisLockProvider.unlock(lockKey)

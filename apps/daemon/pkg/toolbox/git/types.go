@@ -1,9 +1,6 @@
 // Copyright 2025 Daytona Platforms Inc.
 // SPDX-License-Identifier: AGPL-3.0
 
-// Copyright 2024 Daytona Platforms Inc.
-// SPDX-License-Identifier: Apache-2.0
-
 package git
 
 type GitAddRequest struct {
@@ -36,6 +33,11 @@ type GitBranchRequest struct {
 	Path string `json:"path" validate:"required"`
 	Name string `json:"name" validate:"required"`
 } // @name GitBranchRequest
+
+type GitDeleteBranchRequest struct {
+	Path string `json:"path" validate:"required"`
+	Name string `json:"name" validate:"required"`
+}
 
 type ListBranchResponse struct {
 	Branches []string `json:"branches" validate:"required"`

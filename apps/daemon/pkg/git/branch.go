@@ -1,9 +1,6 @@
 // Copyright 2025 Daytona Platforms Inc.
 // SPDX-License-Identifier: AGPL-3.0
 
-// Copyright 2024 Daytona Platforms Inc.
-// SPDX-License-Identifier: Apache-2.0
-
 package git
 
 import (
@@ -46,4 +43,12 @@ func (s *Service) ListBranches() ([]string, error) {
 	})
 
 	return branchList, err
+}
+
+func (s *Service) DeleteBranch(name string) error {
+	repo, err := git.PlainOpen(s.ProjectDir)
+	if err != nil {
+		return err
+	}
+	return repo.Storer.RemoveReference(plumbing.NewBranchReferenceName(name))
 }

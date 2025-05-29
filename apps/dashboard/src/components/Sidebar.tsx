@@ -6,12 +6,14 @@
 import {
   BookOpen,
   Box,
-  ChartColumn,
   ChevronsUpDown,
   Container,
   CreditCard,
+  HardDrive,
   KeyRound,
+  Link2,
   ListChecks,
+  LockKeyhole,
   LogOut,
   Mail,
   Moon,
@@ -46,8 +48,8 @@ import { useMemo } from 'react'
 import { OrganizationPicker } from '@/components/Organizations/OrganizationPicker'
 import { useSelectedOrganization } from '@/hooks/useSelectedOrganization'
 import { useUserOrganizationInvitations } from '@/hooks/useUserOrganizationInvitations'
-import { OrganizationUserRoleEnum } from '@daytonaio/api-client'
-import { Card, CardDescription, CardHeader, CardTitle } from './ui/card'
+import { OrganizationRolePermissionsEnum, OrganizationUserRoleEnum } from '@daytonaio/api-client'
+import { Card, CardHeader, CardTitle } from './ui/card'
 import { Tooltip, TooltipContent } from './ui/tooltip'
 import { TooltipProvider, TooltipTrigger } from './ui/tooltip'
 import { addHours, formatRelative } from 'date-fns'
@@ -59,7 +61,8 @@ export function Sidebar() {
   const { user, signoutRedirect } = useAuth()
   const navigate = useNavigate()
 
-  const { selectedOrganization, authenticatedUserOrganizationMember } = useSelectedOrganization()
+  const { selectedOrganization, authenticatedUserOrganizationMember, authenticatedUserHasPermission } =
+    useSelectedOrganization()
   const { count: organizationInvitationsCount } = useUserOrganizationInvitations()
 
   const sidebarItems = useMemo(() => {
@@ -72,8 +75,15 @@ export function Sidebar() {
         path: RoutePath.IMAGES,
       },
       { icon: <PackageOpen className="w-5 h-5" />, label: 'Registries', path: RoutePath.REGISTRIES },
-      { icon: <ChartColumn className="w-5 h-5" />, label: 'Usage', path: RoutePath.USAGE },
     ]
+
+    if (authenticatedUserHasPermission(OrganizationRolePermissionsEnum.READ_VOLUMES)) {
+      arr.push({ icon: <HardDrive className="w-5 h-5" />, label: 'Volumes', path: RoutePath.VOLUMES })
+    }
+
+    if (authenticatedUserOrganizationMember?.role === OrganizationUserRoleEnum.OWNER) {
+      arr.push({ icon: <LockKeyhole className="w-5 h-5" />, label: 'Limits', path: RoutePath.LIMITS })
+    }
 
     if (
       import.meta.env.VITE_BILLING_API_URL &&
@@ -92,7 +102,7 @@ export function Sidebar() {
     }
     arr.push({ icon: <Settings className="w-5 h-5" />, label: 'Settings', path: RoutePath.SETTINGS })
     return arr
-  }, [authenticatedUserOrganizationMember?.role, selectedOrganization?.personal])
+  }, [authenticatedUserOrganizationMember?.role, selectedOrganization?.personal, authenticatedUserHasPermission])
 
   const handleSignOut = () => {
     signoutRedirect()
@@ -225,6 +235,18 @@ export function Sidebar() {
                 </SidebarMenuButton>
               </DropdownMenuTrigger>
               <DropdownMenuContent side="top" className="w-[--radix-popper-anchor-width]">
+                {import.meta.env.VITE_LINKED_ACCOUNTS_ENABLED === 'true' && (
+                  <DropdownMenuItem asChild>
+                    <Button
+                      variant="ghost"
+                      className="w-full cursor-pointer justify-start"
+                      onClick={() => navigate(RoutePath.LINKED_ACCOUNTS)}
+                    >
+                      <Link2 className="w-4 h-4" />
+                      Linked Accounts
+                    </Button>
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuItem asChild>
                   <Button
                     variant="ghost"
